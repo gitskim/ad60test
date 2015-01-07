@@ -19,7 +19,15 @@ public class RedditItem implements Serializable {
     String score;
     String detail;
     boolean isSelftext = false;
+    String afterTag;
 
+    public String getAfterTag() {
+        return afterTag;
+    }
+
+    public void setAfterTag(String afterTag) {
+        this.afterTag = afterTag;
+    }
 
     public boolean isSelftext() {
         return isSelftext;

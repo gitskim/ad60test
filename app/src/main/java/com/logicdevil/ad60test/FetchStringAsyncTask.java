@@ -29,7 +29,7 @@ public class FetchStringAsyncTask extends AsyncTask<String, Void, List<RedditIte
     ArrayList<RedditItem> redditList;
 
     @Override
-    protected List<RedditItem> doInBackground(String... params) {
+    protected List<RedditItem> doInBackground(String... urlInputArray) {
         Log.v(TAG, "doInbackground just ran");
         redditList = new ArrayList<RedditItem>();
 
@@ -37,10 +37,10 @@ public class FetchStringAsyncTask extends AsyncTask<String, Void, List<RedditIte
         BufferedReader reader = null;
 
         String mJsonStr = null;
-
+        String soonToBeURL = urlInputArray[0];
         try {
 
-            URL url = new URL("http://www.reddit.com/.json");
+            URL url = new URL(soonToBeURL);
 
             Log.v(TAG, "url: " + url.toString());
 
@@ -55,7 +55,6 @@ public class FetchStringAsyncTask extends AsyncTask<String, Void, List<RedditIte
 
             Log.v(TAG, "" + urlConnection.getResponseCode());
 
-            // Read the input stream into a String
             InputStream inputStream = urlConnection.getInputStream();
             StringBuffer buffer = new StringBuffer();
             if (inputStream == null) {
@@ -67,15 +66,11 @@ public class FetchStringAsyncTask extends AsyncTask<String, Void, List<RedditIte
 
             String line;
             while ((line = reader.readLine()) != null) {
-                // Since it's JSON, adding a newline isn't necessary (it won't affect parsing)
-                // But it does make debugging a *lot* easier if you print out the completed
-                // buffer for debugging.
                 Log.v(TAG, "line was read to be: " + line);
                 buffer.append(line + "\n");
             }
 
             if (buffer.length() == 0) {
-                // Stream was empty.  No point in parsing.
                 mJsonStr = null;
             }
             mJsonStr = buffer.toString();
@@ -83,8 +78,6 @@ public class FetchStringAsyncTask extends AsyncTask<String, Void, List<RedditIte
             Log.v(TAG, "mJsonStr is: " + mJsonStr);
         } catch (IOException e) {
             Log.e(TAG, "Error ", e);
-            // If the code didn't successfully get the weather data, there's no point in attempting
-            // to parse it.
             mJsonStr = null;
         } finally {
             if (urlConnection != null) {
@@ -107,6 +100,7 @@ public class FetchStringAsyncTask extends AsyncTask<String, Void, List<RedditIte
 
             JSONObject jsoN = jsonPicture.getJSONObject("data");
             JSONArray children = jsoN.getJSONArray("children");
+
 
             for (int i = 0; i < children.length(); i++) {
                 JSONObject jsonobject = children.getJSONObject(i)
@@ -139,11 +133,24 @@ public class FetchStringAsyncTask extends AsyncTask<String, Void, List<RedditIte
                 redditList.add(redditItem);
 
             }
+
+
+            String after = jsoN.getString("after");
+            redditItem.setAfterTag(after);
+            Log.d(TAG, "after tag is: " + after);
         } catch (JSONException ee) {
             ee.printStackTrace();
         }
 
 
         return redditList;
+    }
+
+    @Override
+    protected void onPostExecute(List<RedditItem> items) {
+        Log.e(TAG, "onpostexecute item");
+            for(RedditItem item : items) {
+                RedditHomePageActivity.listadapter.addRedditItem(item);
+            }
     }
 }

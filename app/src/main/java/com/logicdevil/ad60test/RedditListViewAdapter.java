@@ -25,10 +25,8 @@ public class RedditListViewAdapter extends ArrayAdapter<RedditItem> {
             , ArrayList<ThumbnailHolder> thumbnailList) {
         super(context, textviewResourceId, redditList);
         this.context = getContext();
-        this.redditList = new ArrayList<RedditItem>();
-        this.redditList.addAll(redditList);
-        this.thumbnailList = new ArrayList<ThumbnailHolder>();
-        this.thumbnailList.addAll(thumbnailList);
+        this.redditList = redditList;
+        this.thumbnailList = thumbnailList;
     }
 
     private class ViewHolder {
@@ -36,8 +34,24 @@ public class RedditListViewAdapter extends ArrayAdapter<RedditItem> {
         ImageView imageView;
     }
 
-    public void add(ThumbnailHolder redditItem){
-        this.thumbnailList.add(redditItem);
+    public void addThumbnail(ThumbnailHolder th) {
+        this.thumbnailList.add(th);
+    }
+
+    public void addRedditItem(RedditItem redditItem) {
+
+        this.redditList.add(redditItem);
+        Log.e(TAG, "added item: " +redditItem.author+", size: "+this.redditList.size());
+    }
+
+    @Override
+    public int getCount() {
+        return redditList.size();
+    }
+
+    @Override
+    public long getItemId(int position) {
+        return position;
     }
 
     @Override

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,42 +39,34 @@ import java.util.concurrent.ExecutionException;
 public class RedditHomePageActivity extends ActionBarActivity {
 
     private String TAG = RedditHomePageActivity.class.getSimpleName();
-    ArrayList<RedditItem> redditList;
-    ArrayList<ThumbnailHolder> thumbnailList;
     boolean loadingMore = false;
     View loadMoreView;
-    RedditListViewAdapter listadapter = null;
-    private int m_PreviousTotalCount = 0;
+    public static RedditListViewAdapter listadapter = null;
     ListView redditListView;
-    int start = 0;
-    int limit = 10;
+    int displayed;
+    String newURLTOUSE = "http://www.reddit.com/.json";
+    String[] urlHold = new String[1];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_reddit_home_page);
 
-        redditList = new ArrayList<RedditItem>();
-        thumbnailList = new ArrayList<ThumbnailHolder>();
         redditListView = (ListView) findViewById(R.id.id_reddit_listView);
 
-        final FetchStringAsyncTask fetchStringAsyncTask = new FetchStringAsyncTask();
-        FetchImageAsyncTask fetchImageAsyncTask = new FetchImageAsyncTask();
-
-
+        listadapter = new RedditListViewAdapter(
+                this, R.layout.single_list, new ArrayList<RedditItem>(), new ArrayList<ThumbnailHolder>());
 
         try {
-            redditList = (ArrayList<RedditItem>) fetchStringAsyncTask.execute().get();
-            thumbnailList = (ArrayList<ThumbnailHolder>) fetchImageAsyncTask.execute().get();
+            new FetchStringAsyncTask().execute(newURLTOUSE).get();
+            new FetchImageAsyncTask().execute(newURLTOUSE).get();
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
 
-        listadapter = new RedditListViewAdapter(
-                this, R.layout.single_list, redditList, thumbnailList
-        );
+
 
 
         loadMoreView = ((LayoutInflater) this.getSystemService(Context.LAYOUT_INFLATER_SERVICE))
@@ -100,6 +94,11 @@ public class RedditHomePageActivity extends ActionBarActivity {
                 } else {
                     Toast.makeText(getApplicationContext(), "The content is url"
                             , Toast.LENGTH_SHORT).show();
+                    Intent openUrl = new Intent(Intent.ACTION_VIEW);
+                    String url = detailItem.getDetail();
+                    Log.v(TAG, "Url grabbed for the detail activity is: " + url);
+                    openUrl.setData(Uri.parse(url));
+                    startActivity(openUrl);
                 }
 
                 startActivity(i);
@@ -115,15 +114,42 @@ public class RedditHomePageActivity extends ActionBarActivity {
             @Override
             public void onScroll(AbsListView view, int firstVisibleItem
                     , int visibleItemCount, int totalItemCount) {
+                if(visibleItemCount == displayed) {
+                    return;
+                } else {
+                    displayed = visibleItemCount;
+                }
+
                 int lastInScreen = firstVisibleItem + visibleItemCount;
-                if (totalItemCount == 0 || listadapter ==null)
-                    return;
-                if (m_PreviousTotalCount == totalItemCount)
-                    return;
-                boolean loadMore = firstVisibleItem + visibleItemCount >= totalItemCount;
-                if (loadMore)             {
-                    m_PreviousTotalCount = totalItemCount;
-                    fetchImage();
+                Log.e(TAG, "lastInScreen: " +lastInScreen+", totalItemCount: "+totalItemCount);
+                if((lastInScreen == totalItemCount)) {
+                    Log.e(TAG, "loading more");
+                    List<RedditItem> items = null;
+                    try {
+                        loadingMore = true;
+                        newURLTOUSE = newURLTOUSE + "?after=" + urlHold[0];
+
+                        items = new FetchStringAsyncTask().execute(newURLTOUSE).get();
+
+
+                        if(items.size() != 0) {
+//                            List<ThumbnailHolder> thumbs = new FetchImageAsyncTask().execute(newURLTOUSE).get();
+//                            if(thumbs.size() != 0) {
+                            new FetchStringAsyncTask().execute(newURLTOUSE).get();
+                            Log.d(TAG, "new url is: " + newURLTOUSE);
+                            new FetchImageAsyncTask().execute(newURLTOUSE).get();
+                                listadapter.notifyDataSetChanged();
+                                Log.e(TAG, "notified");
+//                            }
+                            loadingMore = false;
+                        }
+
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
+                    }
+
                 }
             }
         });
@@ -141,7 +167,8 @@ public class RedditHomePageActivity extends ActionBarActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.action_settings) {
+        if (id == R.id.id_menu_refresh) {
+            fetchImage();
             return true;
         }
 
@@ -149,28 +176,38 @@ public class RedditHomePageActivity extends ActionBarActivity {
     }
 
     public void fetchImage () {
-        new FetchImageAsyncTask().execute();
+        new FetchImageAsyncTask().execute(newURLTOUSE);
     }
+
     private class FetchImageAsyncTask extends AsyncTask<String, Void, List<ThumbnailHolder>> {
         private final String TAG = FetchImageAsyncTask.class.getSimpleName();
-        RedditItem redditItem;
-        ThumbnailHolder thumbnailHolder;
-        ArrayList<RedditItem> redditList;
-        ArrayList<ThumbnailHolder> thumbnailList;
+//        ThumbnailHolder thumbnailHolder;
+//        ArrayList<ThumbnailHolder> thumbnailList;
 
+        public URL convertToURL (String url) throws MalformedURLException {
+            URL newbieURL = new URL(url);
+            return newbieURL;
+        }
         @Override
-        protected List<ThumbnailHolder> doInBackground(String... params) {
+        protected List<ThumbnailHolder> doInBackground(String... urlInputArray) {
             Log.v(TAG, "doInbackground just ran");
-            redditList = new ArrayList<RedditItem>();
-            thumbnailList = new ArrayList<ThumbnailHolder>();
+            loadingMore= true;
+            ArrayList<ThumbnailHolder> thumbnailList = new ArrayList<ThumbnailHolder>();
+            URL url = null;
             HttpURLConnection urlConnection = null;
             BufferedReader reader = null;
 
             String mJsonStr = null;
+            String newbieUrl = urlInputArray[0];
+            try {
+                url = convertToURL(newbieUrl);
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            }
 
             try {
 
-                URL url = new URL("http://www.reddit.com/.json");
+//                url = new URL("http://www.reddit.com/.json?after=<after_id_from_last_fetch>");
 
                 Log.v(TAG, "url: " + url.toString());
 
@@ -235,7 +272,6 @@ public class RedditHomePageActivity extends ActionBarActivity {
 
             try {
                 jsonPicture = new JSONObject(vipStr);
-
                 JSONObject jsoN = jsonPicture.getJSONObject("data");
                 JSONArray children = jsoN.getJSONArray("children");
 
@@ -245,7 +281,7 @@ public class RedditHomePageActivity extends ActionBarActivity {
                     JSONObject jsonobject = children.getJSONObject(i)
                             .getJSONObject("data");
 
-                    thumbnailHolder  = new ThumbnailHolder();
+                    ThumbnailHolder thumbnailHolder  = new ThumbnailHolder();
 
                     Drawable d = null;
                     try {
@@ -256,7 +292,9 @@ public class RedditHomePageActivity extends ActionBarActivity {
                         InputStream in=null;
                         try {
                             in = (InputStream) new URL(urlImage).getContent();
-                            d = Drawable.createFromStream(in, "src name");
+                            if (in!=null) {
+                                d = Drawable.createFromStream(in, "src name");
+                            }
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -272,46 +310,23 @@ public class RedditHomePageActivity extends ActionBarActivity {
 //                    loadingMore = false;
 
                 }
+
+                String after = jsoN.getString("after");
+                urlHold[0] = after;
+                Log.d(TAG, "after tag is: " + after);
             } catch (JSONException ee) {
                 ee.printStackTrace();
             }
-
-
 
             return thumbnailList;
         }
 
         @Override
-        protected void onPostExecute(List<ThumbnailHolder> thumbnailHList) {
-            String content = "";
-            JSONObject responseObj = null;
-
-            try {
-
-                Gson gson = new Gson();
-                responseObj = new JSONObject(content);
-                JSONArray countryListObj = responseObj.getJSONArray("countryList");
-
-                if(countryListObj.length() == 0){
-                    redditListView.removeFooterView(loadMoreView);
-                }
-                else {
-                    for (int i=0; i<countryListObj.length(); i++){
-                        start++;
-                        String redditItem = countryListObj.getJSONObject(i).toString();
-                        RedditItem country = gson.fromJson(redditItem, RedditItem.class);
-                        redditList.add(country);
-                        listadapter.add(country);
-                    }
-
-                    listadapter.notifyDataSetChanged();
-                    loadingMore = false;
-                }
-
-            } catch (JSONException e) {
-                e.printStackTrace();
+        protected void onPostExecute(List<ThumbnailHolder> thumbnails) {
+            Log.e(TAG, "onpostexecute thumbnail");
+            for(ThumbnailHolder thumbnail : thumbnails) {
+                RedditHomePageActivity.listadapter.addThumbnail(thumbnail);
             }
-
         }
 
     }
